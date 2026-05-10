@@ -1,7 +1,8 @@
+import { useMemo, useEffect } from 'react'
 import { X, FileText, Download, Eye, Calendar, ImageIcon } from 'lucide-react'
 
 const FORMAT_LABELS = { pdf: 'PDF', doc: 'DOC', txt: 'TXT' }
-const STRUCTURE_LABELS = { 'multi-page': 'Multi-page document', 'single-docs': 'Separate documents' }
+const STRUCTURE_LABELS = { multi: 'Multi-page document', single: 'Separate documents' }
 
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob)
@@ -12,18 +13,30 @@ function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
-function previewBlob(blob, name) {
+function previewBlob(blob) {
   const url = URL.createObjectURL(blob)
   window.open(url, '_blank')
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
 export default function ConversionDetailsModal({ entry, onClose }) {
-  const { imageCount, imageNames, outputFormat, docStructure, outputFiles, timestamp } = entry
+  const { imageCount, imageNames, imageBlobs, outputFormat, docStructure, outputFiles, timestamp } = entry
 
   const dateStr = new Date(timestamp).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
+
+  // Create object URLs for image previews while the modal is open
+  const imageUrls = useMemo(() => {
+    if (!imageBlobs?.length) return []
+    return imageBlobs.map(blob => URL.createObjectURL(blob))
+  }, [imageBlobs])
+
+  // Revoke object URLs when modal unmounts to free memory
+  useEffect(() => {
+    return () => imageUrls.forEach(url => URL.revokeObjectURL(url))
+  }, [imageUrls])
 
   function handleBackdrop(e) {
     if (e.target === e.currentTarget) onClose()
@@ -56,7 +69,7 @@ export default function ConversionDetailsModal({ entry, onClose }) {
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full
                              bg-brand-100 dark:bg-brand-950/60 text-brand-600 dark:text-brand-400">
               <FileText className="w-3.5 h-3.5" />
-              {FORMAT_LABELS[outputFormat] || outputFormat}
+              {FORMAT_LABELS[outputFormat] || outputFormat?.toUpperCase()}
             </span>
             <span className="inline-flex text-xs font-medium px-3 py-1.5 rounded-full
                              bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
@@ -69,18 +82,57 @@ export default function ConversionDetailsModal({ entry, onClose }) {
             <h3 className="text-sm font-semibold text-brand-800 dark:text-gray-200 mb-2">
               Source Images ({imageCount})
             </h3>
-            <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
-              {imageNames?.map((name, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg
-                             bg-brand-50 dark:bg-gray-800"
-                >
-                  <ImageIcon className="w-3.5 h-3.5 text-brand-400 dark:text-gray-500 shrink-0" />
-                  <span className="text-sm text-brand-700 dark:text-gray-300 truncate">{name}</span>
-                </div>
-              ))}
-            </div>
+
+            {imageUrls.length > 0 ? (
+              // Thumbnail grid — click any image to open full-size in a new tab
+              <div className="grid grid-cols-3 gap-2">
+                {imageUrls.map((url, i) => (
+                  <button
+                    key={i}
+                    onClick={() => window.open(url, '_blank')}
+                    className="relative aspect-[3/4] rounded-xl overflow-hidden bg-gray-100
+                               dark:bg-gray-800 group focus:outline-none focus:ring-2
+                               focus:ring-brand-500"
+                    title={imageNames?.[i]}
+                  >
+                    <img
+                      src={url}
+                      alt={imageNames?.[i]}
+                      className="w-full h-full object-cover transition-transform duration-200
+                                 group-hover:scale-105"
+                    />
+                    {/* Filename overlay */}
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70
+                                    to-transparent px-2 py-1.5">
+                      <p className="text-xs text-white truncate leading-tight">
+                        {imageNames?.[i]}
+                      </p>
+                    </div>
+                    {/* Hover eye icon */}
+                    <div className="absolute inset-0 flex items-center justify-center
+                                    opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="bg-black/50 rounded-full p-2">
+                        <Eye className="w-4 h-4 text-white" />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              // Fallback for older entries saved before imageBlobs was added
+              <div className="flex flex-col gap-1.5">
+                {imageNames?.map((name, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg
+                               bg-brand-50 dark:bg-gray-800"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-brand-400 dark:text-gray-500 shrink-0" />
+                    <span className="text-sm text-brand-700 dark:text-gray-300 truncate">{name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Output files */}
@@ -103,9 +155,10 @@ export default function ConversionDetailsModal({ entry, onClose }) {
                     {f.blob && (
                       <div className="flex gap-1 shrink-0">
                         <button
-                          onClick={() => previewBlob(f.blob, f.name)}
+                          onClick={() => previewBlob(f.blob)}
                           className="p-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-gray-700
-                                     text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 transition-colors"
+                                     text-brand-400 hover:text-brand-600 dark:hover:text-brand-300
+                                     transition-colors"
                           title="Preview"
                         >
                           <Eye className="w-4 h-4" />
@@ -113,7 +166,8 @@ export default function ConversionDetailsModal({ entry, onClose }) {
                         <button
                           onClick={() => downloadBlob(f.blob, f.name)}
                           className="p-1.5 rounded-lg hover:bg-brand-100 dark:hover:bg-gray-700
-                                     text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 transition-colors"
+                                     text-brand-400 hover:text-brand-600 dark:hover:text-brand-300
+                                     transition-colors"
                           title="Download"
                         >
                           <Download className="w-4 h-4" />

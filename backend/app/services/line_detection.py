@@ -27,15 +27,16 @@ def get_crops_for_image(image_source: str | np.ndarray) -> list[PILImage.Image]:
     Returns:
         List of RGB PIL Image crops. Falls back to the whole image if no lines detected.
     """
-    yolo = _get_model()
-    results = yolo.predict(source=image_source, conf=0.25, verbose=False)
-
+    # Resolve to a 3-channel BGR array first — YOLO requires 3 channels.
     if isinstance(image_source, str):
         img = cv2.imread(image_source)
     elif image_source.ndim == 2:
         img = cv2.cvtColor(image_source, cv2.COLOR_GRAY2BGR)
     else:
         img = image_source
+
+    yolo = _get_model()
+    results = yolo.predict(source=img, conf=0.25, verbose=False)
 
     boxes = results[0].boxes.xyxy.cpu().numpy()
     if len(boxes) == 0:

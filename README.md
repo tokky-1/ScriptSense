@@ -58,13 +58,7 @@ make env_copy
 just env_copy
 ```
 
-**3. Set up the model conda environment (first time only):**
-```bash
-conda env create -f model/environment.yml
-conda activate ml-env
-```
-
-**4. Start all services:**
+**3. Start all services:**
 ```bash
 bash start.sh
 # or
