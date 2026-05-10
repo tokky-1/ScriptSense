@@ -19,7 +19,7 @@ build/
 !.env.example
 
 # Model artifacts
-model/saved_models/*
+model/saved_models/trocr*
 !model/saved_models/.gitkeep
 model/data/raw/*
 !model/data/raw/.gitkeep

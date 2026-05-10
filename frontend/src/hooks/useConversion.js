@@ -32,6 +32,7 @@ export function useConversion() {
         imageCount: images.length,
         outputFormat: settings.outputFormat,
         docStructure: settings.docStructure,
+        imageBlobs: images,  // File objects are Blobs — IndexedDB stores them natively
         outputFiles: result.files.map(f => ({ name: f.name, blob: f.blob })),
       })
     } catch (err) {
